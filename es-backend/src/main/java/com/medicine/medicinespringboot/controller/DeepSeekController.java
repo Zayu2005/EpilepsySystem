@@ -58,7 +58,6 @@
 //@Slf4j
 //@RestController
 //public class DeepSeekController {
-//    final static String API_KEY = "sk-f15f384d49eb8df17db55a2d7034ea8eee5ab477281eb156e6279a226f51cc82";
 //    private final Gson gson = new Gson();
 //
 //    @PostMapping("tall")
