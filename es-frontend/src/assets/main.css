@@ -1,0 +1,8 @@
+/* ... 现有样式 ... */
+
+/* 全局自定义鼠标样式 */
+html, body {
+  cursor: url('@/assets/pointer.png'), auto !important;
+}
+
+/* ... 其他样式 ... */

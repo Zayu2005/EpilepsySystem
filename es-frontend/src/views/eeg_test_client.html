@@ -1,0 +1,766 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EEG数据服务器测试</title>
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            font-family: 'Microsoft YaHei', Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+            color: #333;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+        h1, h2, h3 {
+            color: #2c3e50;
+        }
+        .section {
+            margin-bottom: 30px;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            background-color: #f9f9f9;
+        }
+        .controls {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+        button {
+            padding: 8px 16px;
+            background-color: #3498db;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        button:hover {
+            background-color: #2980b9;
+        }
+        button:disabled {
+            background-color: #95a5a6;
+            cursor: not-allowed;
+        }
+        input, select {
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .status {
+            padding: 10px;
+            background-color: #ecf0f1;
+            border-radius: 4px;
+            margin-bottom: 15px;
+        }
+        .status-item {
+            margin-bottom: 5px;
+        }
+        .data-display {
+            height: 200px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            padding: 10px;
+            background-color: #fff;
+            border-radius: 4px;
+            font-family: monospace;
+            white-space: pre-wrap;
+        }
+        .chart-container {
+            position: relative;
+            height: 600px;
+            margin-top: 20px;
+        }
+        .flex-row {
+            display: flex;
+            gap: 20px;
+        }
+        .flex-column {
+            flex: 1;
+        }
+        .success {
+            color: #27ae60;
+        }
+        .error {
+            color: #e74c3c;
+        }
+        .warning {
+            color: #f39c12;
+        }
+        .seizure-alert {
+            background-color: #e74c3c;
+            color: white;
+            padding: 10px;
+            border-radius: 4px;
+            margin-top: 10px;
+            display: none;
+        }
+        .channel-controls {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 5px;
+            margin-bottom: 10px;
+        }
+        .channel-checkbox {
+            display: flex;
+            align-items: center;
+            margin-right: 10px;
+        }
+        .channel-checkbox input {
+            margin-right: 5px;
+        }
+        .color-box {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            margin-right: 5px;
+            border: 1px solid #ccc;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>EEG数据服务器测试工具</h1>
+        
+        <div class="section">
+            <h2>连接状态</h2>
+            <div class="status">
+                <div class="status-item">WebSocket连接状态: <span id="connection-status">未连接</span></div>
+                <div class="status-item">当前时间: <span id="timestamp">-</span> 秒</div>
+                <div class="status-item">是否发作期间: <span id="seizure-status">-</span></div>
+                <div class="status-item">接收数据包数量: <span id="packet-count">0</span></div>
+                <div class="status-item">通道数量: <span id="channel-count">0</span></div>
+                <div class="seizure-alert" id="seizure-alert">
+                    <strong>警告:</strong> 检测到发作活动！
+                </div>
+            </div>
+            
+            <div class="controls">
+                <button id="connect-btn">连接WebSocket</button>
+                <button id="get-info-btn">获取EEG信息</button>
+            </div>
+        </div>
+        
+        <div class="flex-row">
+            <div class="flex-column section">
+                <h2>获取EEG数据</h2>
+                <div class="controls">
+                    <div>
+                        <label for="start-time">开始时间 (秒):</label>
+                        <input type="number" id="start-time" value="0" min="0" step="1">
+                    </div>
+                    <div>
+                        <label for="window-size">窗口大小 (秒):</label>
+                        <input type="number" id="window-size" value="1" min="0.1" step="0.1">
+                    </div>
+                    <button id="get-data-btn">获取数据</button>
+                </div>
+                
+                <h3>数据预览</h3>
+                <div class="data-display" id="data-preview">等待数据...</div>
+            </div>
+            
+            <div class="flex-column section">
+                <h2>实时数据流</h2>
+                <div class="controls">
+                    <div>
+                        <label for="stream-window-size">窗口大小 (秒):</label>
+                        <input type="number" id="stream-window-size" value="1" min="0.1" step="0.1">
+                    </div>
+                    <div>
+                        <label for="stream-step-size">步长 (秒):</label>
+                        <input type="number" id="stream-step-size" value="0.5" min="0.1" step="0.1">
+                    </div>
+                    <button id="start-stream-btn">开始数据流</button>
+                    <button id="stop-stream-btn" disabled>停止数据流</button>
+                </div>
+                
+                <h3>实时数据</h3>
+                <div class="data-display" id="stream-preview">等待数据流...</div>
+            </div>
+        </div>
+        
+        <div class="section">
+            <h2>EEG数据可视化</h2>
+            <div class="controls">
+                <div>
+                    <label for="display-points">显示点数:</label>
+                    <input type="number" id="display-points" value="2560" min="256" max="5120" step="256">
+                </div>
+                <div>
+                    <label for="y-scale">Y轴缩放:</label>
+                    <input type="number" id="y-scale" value="2" min="0.1" max="10" step="0.1">
+                </div>
+                <div>
+                    <label for="channel-offset">通道间距:</label>
+                    <input type="number" id="channel-offset" value="200" min="50" max="500" step="10">
+                </div>
+                <button id="clear-chart-btn">清除图表</button>
+                <button id="toggle-all-btn">全选/取消</button>
+            </div>
+            
+            <div id="channel-selector" class="channel-controls">
+                <!-- 通道选择器将在这里动态生成 -->
+            </div>
+            
+            <div class="chart-container">
+                <canvas id="eeg-chart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 全局变量
+        let socket = null;
+        let packetCount = 0;
+        let eegChart = null;
+        let chartData = {
+            labels: [],
+            datasets: []
+        };
+        let channelBuffers = {};
+        let selectedChannels = new Set();
+        let maxDataPoints = 100;
+        let eegInfo = null;
+        let channelColors = {};
+        let yScale = 1;
+        let channelOffset = 100;
+        
+        // 预定义的颜色列表
+        const colorPalette = [
+            'rgb(255, 99, 132)', 'rgb(54, 162, 235)', 'rgb(255, 206, 86)', 
+            'rgb(75, 192, 192)', 'rgb(153, 102, 255)', 'rgb(255, 159, 64)',
+            'rgb(255, 0, 0)', 'rgb(0, 255, 0)', 'rgb(0, 0, 255)',
+            'rgb(128, 0, 128)', 'rgb(0, 128, 128)', 'rgb(128, 128, 0)',
+            'rgb(128, 0, 0)', 'rgb(0, 128, 0)', 'rgb(0, 0, 128)',
+            'rgb(255, 0, 255)', 'rgb(0, 255, 255)', 'rgb(255, 255, 0)',
+            'rgb(192, 192, 192)', 'rgb(128, 128, 128)', 'rgb(0, 0, 0)'
+        ];
+        
+        // DOM元素
+        const connectBtn = document.getElementById('connect-btn');
+        const getInfoBtn = document.getElementById('get-info-btn');
+        const getDataBtn = document.getElementById('get-data-btn');
+        const startStreamBtn = document.getElementById('start-stream-btn');
+        const stopStreamBtn = document.getElementById('stop-stream-btn');
+        const clearChartBtn = document.getElementById('clear-chart-btn');
+        const toggleAllBtn = document.getElementById('toggle-all-btn');
+        const connectionStatus = document.getElementById('connection-status');
+        const timestampDisplay = document.getElementById('timestamp');
+        const seizureStatus = document.getElementById('seizure-status');
+        const packetCountDisplay = document.getElementById('packet-count');
+        const channelCountDisplay = document.getElementById('channel-count');
+        const dataPreview = document.getElementById('data-preview');
+        const streamPreview = document.getElementById('stream-preview');
+        const displayPointsInput = document.getElementById('display-points');
+        const yScaleInput = document.getElementById('y-scale');
+        const channelOffsetInput = document.getElementById('channel-offset');
+        const channelSelector = document.getElementById('channel-selector');
+        const seizureAlert = document.getElementById('seizure-alert');
+        
+        // 初始化图表
+        function initChart() {
+            const ctx = document.getElementById('eeg-chart').getContext('2d');
+            eegChart = new Chart(ctx, {
+                type: 'line',
+                data: chartData,
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: {
+                            type: 'linear',
+                            title: {
+                                display: true,
+                                text: 'Time (s)'
+                            },
+                            grid: {
+                                color: 'rgba(0, 0, 0, 0.1)',
+                                drawTicks: true
+                            },
+                            ticks: {
+                                maxRotation: 0,
+                                callback: function(value) {
+                                    return (value / 256).toFixed(1);
+                                }
+                            }
+                        }
+                    },
+                    animation: {
+                        duration: 0
+                    },
+                    plugins: {
+                        legend: {
+                            position: 'left',
+                            labels: {
+                                boxWidth: 12,
+                                font: {
+                                    size: 10
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+        
+        // 更新图表数据
+        function updateChart(newData) {
+            // 更新每个选中通道的数据
+            for (const channel in newData) {
+                if (!channelBuffers[channel]) {
+                    channelBuffers[channel] = [];
+                }
+                
+                // 添加新数据到缓冲区
+                if (Array.isArray(newData[channel])) {
+                    channelBuffers[channel] = [...channelBuffers[channel], ...newData[channel]];
+                } else if (newData[channel].data) {
+                    // 如果数据在 .data 属性中
+                    channelBuffers[channel] = [...channelBuffers[channel], ...newData[channel].data];
+                }
+                
+                // 保持缓冲区大小不超过最大点数
+                if (channelBuffers[channel].length > maxDataPoints) {
+                    channelBuffers[channel] = channelBuffers[channel].slice(-maxDataPoints);
+                }
+            }
+            
+            // 更新图表标签
+            chartData.labels = Array.from({ length: maxDataPoints }, (_, i) => i);
+            
+            // 清空当前数据集
+            chartData.datasets = [];
+            
+            // 为每个选中的通道创建数据集
+            let channelIndex = 0;
+            for (const channel of selectedChannels) {
+                if (channelBuffers[channel]) {
+                    // 计算通道偏移量
+                    const offset = channelIndex * channelOffset;
+                    
+                    // 对数据进行锐化处理
+                    const rawData = channelBuffers[channel];
+                    const sharpenedData = rawData.map((val, i, arr) => {
+                        if (i === 0 || i === arr.length - 1) return val;
+                        // 使用拉普拉斯算子进行锐化
+                        const sharpness = 2; // 锐化强度
+                        return val * (1 + sharpness) - (arr[i-1] + arr[i+1]) * (sharpness/2);
+                    });
+                    
+                    // 创建数据集
+                    chartData.datasets.push({
+                        label: channel,
+                        data: sharpenedData.map(val => (val * yScale) + offset),
+                        borderColor: channelColors[channel] || 'rgb(75, 192, 192)',
+                        borderWidth: 1,
+                        tension: 0,  // 移除平滑效果以保持锐化效果
+                        pointRadius: 0,
+                        fill: false,
+                        spanGaps: true
+                    });
+                    
+                    channelIndex++;
+                }
+            }
+            
+            // 计算Y轴范围
+            const totalChannels = selectedChannels.size;
+            const maxOffset = (totalChannels - 1) * channelOffset;
+            
+            // 更新图表配置
+            eegChart.options.scales.y = {
+                type: 'linear',
+                position: 'left',
+                min: -100,  // 设置合适的最小值
+                max: maxOffset + 100,  // 设置合适的最大值
+                grid: {
+                    color: function(context) {
+                        // 为每个通道添加网格线
+                        if (context.tick.value % channelOffset === 0) {
+                            return 'rgba(0, 0, 0, 0.2)';
+                        }
+                        return 'rgba(0, 0, 0, 0.1)';
+                    }
+                },
+                ticks: {
+                    stepSize: channelOffset,
+                    callback: function(value) {
+                        // 在每个通道位置显示标签
+                        const channelIndex = Math.floor(value / channelOffset);
+                        const channels = Array.from(selectedChannels);
+                        if (value % channelOffset === 0 && channelIndex < channels.length) {
+                            return channels[channelIndex];
+                        }
+                        return '';
+                    }
+                }
+            };
+            
+            // 更新图表
+            eegChart.update('none');
+        }
+        
+        // 清除图表数据
+        function clearChart() {
+            channelBuffers = {};
+            chartData.labels = [];
+            chartData.datasets = [];
+            eegChart.update();
+        }
+        
+        // 连接WebSocket
+        function connectWebSocket() {
+            if (socket) {
+                socket.disconnect();
+                socket = null;
+                connectBtn.textContent = '连接WebSocket';
+                connectionStatus.textContent = '未连接';
+                connectionStatus.className = '';
+                startStreamBtn.disabled = true;  // 断开连接时禁用按钮
+                return;
+            }
+            
+            connectionStatus.textContent = '正在连接...';
+            connectionStatus.className = 'warning';
+            
+            // 创建Socket.IO连接
+            socket = io('http://localhost:5000', {
+                transports: ['websocket'],
+                reconnection: true
+            });
+            
+            // 连接事件
+            socket.on('connect', () => {
+                console.log('WebSocket已连接');
+                connectionStatus.textContent = '已连接';
+                connectionStatus.className = 'success';
+                connectBtn.textContent = '断开连接';
+                startStreamBtn.disabled = false;  // 连接成功时启用按钮
+            });
+            
+            // 断开连接事件
+            socket.on('disconnect', () => {
+                console.log('WebSocket已断开');
+                connectionStatus.textContent = '已断开';
+                connectionStatus.className = 'error';
+                connectBtn.textContent = '连接WebSocket';
+                startStreamBtn.disabled = true;  // 断开连接时禁用按钮
+                stopStreamBtn.disabled = true;   // 同时禁用停止按钮
+            });
+            
+            // 连接响应
+            socket.on('connection_response', (data) => {
+                console.log('连接响应:', data);
+            });
+            
+            // 接收EEG数据
+            socket.on('eeg_data', (data) => {
+                packetCount++;
+                packetCountDisplay.textContent = packetCount;
+                
+                // 更新状态显示
+                timestampDisplay.textContent = data.timestamp.toFixed(2);
+                seizureStatus.textContent = data.is_seizure ? '是' : '否';
+                channelCountDisplay.textContent = data.channels.length;
+                
+                // 显示/隐藏发作警告
+                seizureAlert.style.display = data.is_seizure ? 'block' : 'none';
+                
+                // 首次接收数据时，更新通道选择器
+                if (packetCount === 1) {
+                    updateChannelSelector(data.channels);
+                }
+                
+                // 更新数据预览
+                const previewData = {
+                    timestamp: data.timestamp,
+                    is_seizure: data.is_seizure,
+                    channels: data.channels.length
+                };
+                
+                // 为选定通道添加数据样本
+                if (selectedChannels.size > 0) {
+                    previewData.selected_channels = Array.from(selectedChannels).length;
+                    
+                    // 更新图表
+                    updateChart(data.data);
+                }
+                
+                streamPreview.textContent = JSON.stringify(previewData, null, 2);
+            });
+            
+            // 数据流结束事件
+            socket.on('eeg_stream_end', (data) => {
+                console.log('数据流结束:', data);
+                stopStreamBtn.disabled = true;
+                startStreamBtn.disabled = false;
+                streamPreview.textContent += '\n\n数据流已结束';
+            });
+            
+            // 错误处理
+            socket.on('error', (error) => {
+                console.error('WebSocket错误:', error);
+                connectionStatus.textContent = '连接错误';
+                connectionStatus.className = 'error';
+            });
+        }
+        
+        // 更新通道选择器
+        function updateChannelSelector(channels) {
+            channelSelector.innerHTML = '';
+            
+            // 为每个通道分配颜色
+            channels.forEach((channel, index) => {
+                const colorIndex = index % colorPalette.length;
+                channelColors[channel] = colorPalette[colorIndex];
+                
+                const channelDiv = document.createElement('div');
+                channelDiv.className = 'channel-checkbox';
+                
+                const colorBox = document.createElement('span');
+                colorBox.className = 'color-box';
+                colorBox.style.backgroundColor = channelColors[channel];
+                
+                const checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                checkbox.id = `channel-${channel}`;
+                checkbox.value = channel;
+                
+                const label = document.createElement('label');
+                label.htmlFor = `channel-${channel}`;
+                label.textContent = channel;
+                
+                // 默认选择前5个通道
+                if (index < 5) {
+                    checkbox.checked = true;
+                    selectedChannels.add(channel);
+                }
+                
+                // 添加事件监听器
+                checkbox.addEventListener('change', function() {
+                    if (this.checked) {
+                        selectedChannels.add(channel);
+                    } else {
+                        selectedChannels.delete(channel);
+                    }
+                    
+                    // 更新图表
+                    if (Object.keys(channelBuffers).length > 0) {
+                        updateChart({});
+                    }
+                });
+                
+                channelDiv.appendChild(colorBox);
+                channelDiv.appendChild(checkbox);
+                channelDiv.appendChild(label);
+                channelSelector.appendChild(channelDiv);
+            });
+        }
+        
+        // 全选/取消所有通道
+        function toggleAllChannels() {
+            const checkboxes = channelSelector.querySelectorAll('input[type="checkbox"]');
+            const allChecked = Array.from(checkboxes).every(cb => cb.checked);
+            
+            checkboxes.forEach(checkbox => {
+                checkbox.checked = !allChecked;
+                const channel = checkbox.value;
+                
+                if (!allChecked) {
+                    selectedChannels.add(channel);
+                } else {
+                    selectedChannels.delete(channel);
+                }
+            });
+            
+            // 更新图表
+            if (Object.keys(channelBuffers).length > 0) {
+                updateChart({});
+            }
+        }
+        
+        // 获取EEG信息
+        function getEEGInfo() {
+            fetch('http://localhost:5000/eeg/info')
+                .then(response => response.json())
+                .then(data => {
+                    console.log('EEG信息:', data);
+                    eegInfo = data;
+                    
+                    // 更新通道选择器
+                    updateChannelSelector(data.channels);
+                    
+                    // 显示信息
+                    dataPreview.textContent = JSON.stringify(data, null, 2);
+                    
+                    // 更新通道计数
+                    channelCountDisplay.textContent = data.n_channels;
+                })
+                .catch(error => {
+                    console.error('获取EEG信息失败:', error);
+                    dataPreview.textContent = '获取数据失败: ' + error.message;
+                });
+        }
+        
+        // 获取EEG数据
+        function getEEGData() {
+            const startTime = document.getElementById('start-time').value;
+            const windowSize = document.getElementById('window-size').value;
+            
+            fetch(`http://localhost:5000/eeg/data?start_time=${startTime}&window_size=${windowSize}`)
+                .then(response => response.json())
+                .then(data => {
+                    console.log('EEG数据:', data);
+                    
+                    // 显示数据预览
+                    const previewData = {
+                        timestamp: data.timestamp,
+                        window_size: data.window_size,
+                        channels: data.channels.length,
+                        sampling_rate: data.sampling_rate
+                    };
+                    
+                    // 为每个通道添加统计信息
+                    previewData.channel_stats = {};
+                    for (const channel in data.data) {
+                        previewData.channel_stats[channel] = {
+                            mean: data.data[channel].mean,
+                            std: data.data[channel].std,
+                            min: data.data[channel].min,
+                            max: data.data[channel].max
+                        };
+                    }
+                    
+                    dataPreview.textContent = JSON.stringify(previewData, null, 2);
+                    
+                    // 清除图表准备接收新数据
+                    clearChart();
+                    
+                    // 准备通道数据
+                    const channelData = {};
+                    for (const channel of selectedChannels) {
+                        if (data.data[channel]) {
+                            channelData[channel] = data.data[channel].data;
+                        }
+                    }
+                    
+                    // 更新图表
+                    updateChart(channelData);
+                })
+                .catch(error => {
+                    console.error('获取EEG数据失败:', error);
+                    dataPreview.textContent = '获取数据失败: ' + error.message;
+                });
+        }
+        
+        // 开始数据流
+        function startStream() {
+            const windowSize = document.getElementById('stream-window-size').value;
+            const stepSize = document.getElementById('stream-step-size').value;
+            
+            fetch('http://localhost:5000/eeg/stream/start', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    window_size: parseFloat(windowSize),
+                    step_size: parseFloat(stepSize)
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                console.log('启动数据流响应:', data);
+                if (data.status === 'success') {
+                    startStreamBtn.disabled = true;
+                    stopStreamBtn.disabled = false;
+                    streamPreview.textContent = '数据流已启动，等待数据...\n';
+                    
+                    // 清除图表准备接收新数据
+                    clearChart();
+                } else {
+                    streamPreview.textContent = '启动数据流失败: ' + data.message;
+                }
+            })
+            .catch(error => {
+                console.error('启动数据流请求失败:', error);
+                streamPreview.textContent = '启动数据流请求失败: ' + error.message;
+            });
+        }
+        
+        // 停止数据流
+        function stopStream() {
+            fetch('http://localhost:5000/eeg/stream/stop', {
+                method: 'POST'
+            })
+            .then(response => response.json())
+            .then(data => {
+                console.log('停止数据流响应:', data);
+                if (data.status === 'success') {
+                    stopStreamBtn.disabled = true;
+                    startStreamBtn.disabled = false;
+                    streamPreview.textContent += '\n数据流已手动停止';
+                } else {
+                    streamPreview.textContent += '\n停止数据流失败: ' + data.message;
+                }
+            })
+            .catch(error => {
+                console.error('停止数据流请求失败:', error);
+                streamPreview.textContent += '\n停止数据流请求失败: ' + error.message;
+            });
+        }
+        
+        // 事件监听器
+        connectBtn.addEventListener('click', connectWebSocket);
+        getInfoBtn.addEventListener('click', getEEGInfo);
+        getDataBtn.addEventListener('click', getEEGData);
+        startStreamBtn.addEventListener('click', startStream);
+        stopStreamBtn.addEventListener('click', stopStream);
+        clearChartBtn.addEventListener('click', clearChart);
+        toggleAllBtn.addEventListener('click', toggleAllChannels);
+        
+        // 显示点数变化
+        displayPointsInput.addEventListener('change', function() {
+            maxDataPoints = parseInt(this.value);
+            
+            // 调整所有通道的缓冲区大小
+            for (const channel in channelBuffers) {
+                if (channelBuffers[channel].length > maxDataPoints) {
+                    channelBuffers[channel] = channelBuffers[channel].slice(channelBuffers[channel].length - maxDataPoints);
+                }
+            }
+            
+            // 更新图表
+            updateChart({});
+        });
+        
+        // Y轴缩放变化
+        yScaleInput.addEventListener('change', function() {
+            yScale = parseFloat(this.value);
+            updateChart({});
+        });
+        
+        // 通道间距变化
+        channelOffsetInput.addEventListener('change', function() {
+            channelOffset = parseInt(this.value);
+            updateChart({});
+        });
+        
+        // 初始化
+        initChart();
+    </script>
+</body>
+</html>
