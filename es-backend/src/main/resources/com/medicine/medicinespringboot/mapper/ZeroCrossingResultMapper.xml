@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.medicine.medicinespringboot.mapper.ZeroCrossingResultMapper">
+
+    <!-- 批量插入 -->
+    <insert id="batchInsert" parameterType="list">
+        INSERT INTO zero_crossing_results
+        (analysis_id, channel, image_url)
+        VALUES
+        <foreach collection="list" item="item" separator=",">
+            (#{item.analysisId}, #{item.channel}, #{item.imageUrl})
+        </foreach>
+    </insert>
+
+    <!-- 根据分析ID查询 -->
+    <select id="selectByAnalysisId" resultType="com.medicine.medicinespringboot.pojo.ZeroCrossingResult">
+        SELECT
+        zc_id AS zcId,
+        analysis_id AS analysisId,
+        channel,
+        image_url AS imageUrl
+        FROM zero_crossing_results
+        WHERE analysis_id = #{analysisId}
+        <if test="channel != null">
+            AND channel = #{channel}
+        </if>
+        ORDER BY zc_id ASC
+    </select>
+
+    <!-- 按通道统计数量 -->
+    <select id="countByChannel" resultType="map">
+        SELECT
+            channel,
+            COUNT(*) AS count
+        FROM zero_crossing_results
+        WHERE analysis_id = #{analysisId}
+        GROUP BY channel
+    </select>
+
+    <!-- 动态条件查询 -->
+    <select id="selectByCondition" resultType="com.medicine.medicinespringboot.pojo.ZeroCrossingResult">
+        SELECT
+        zc_id AS zcId,
+        analysis_id AS analysisId,
+        channel,
+        image_url AS imageUrl
+        FROM zero_crossing_results
+        <where>
+            <if test="analysisId != null">
+                AND analysis_id = #{analysisId}
+            </if>
+            <if test="channels != null and channels.size() > 0">
+                AND channel IN
+                <foreach item="item" collection="channels" open="(" separator="," close=")">
+                    #{item}
+                </foreach>
+            </if>
+            <if test="keyword != null">
+                AND image_url LIKE CONCAT('%',#{keyword},'%')
+            </if>
+        </where>
+    </select>
+
+</mapper>

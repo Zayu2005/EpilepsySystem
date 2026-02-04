@@ -1,0 +1,61 @@
+
+flask:
+  service:
+    url: http://localhost:5001/feature
+
+spring:
+  main:
+    allow-bean-definition-overriding: true
+    lazy-initialization: true
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    username: name
+    password: password
+    url: jdbc:mysql://localhost:3306/medicine?useUnicode=true&characterEncoding=utf-8&useSSL=false&serverTimezone=Asia/Shanghai
+  servlet:
+    multipart:
+      enabled: true
+      max-file-size: -1       #不限制文件大小
+      max-request-size: -1    # 最大支持请求大小
+  ai:
+    zhipuai:
+      api-key: your-zhipuai-api-key
+      chat:
+        options:
+          model: glm-4-plus
+      embedding:
+        enabled: true
+    openai:
+      api-key: your-key
+      base-url: https://api.openai-hk.com
+      chat:
+        options:
+          model: gpt-4o-mini
+      embedding:
+        enabled: true
+
+        # 阿里灵积
+    dash-scope:
+      api-key: your-dash-scope-api-key
+      chat:
+        options:
+          model: qwen-max
+      embedding:
+        enabled: true
+
+
+mybatis:
+  configuration:
+    map-underscore-to-camel-case: true #开启驼峰命名，类似于将create_time转换为createTime
+
+# 七牛云
+qiniu:
+  accessKey:
+  secretKey:
+  bucket:
+  hostName:
+
+logging:
+  file:
+    name:
+

@@ -1,0 +1,129 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.medicine.medicinespringboot.mapper.EegMapper">
+    <!-- 插入主表数据（eeg_analysis_result） -->
+    <insert id="saveAnalysisResult" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO eeg_analysis_result (
+            patient_id,
+            user_id,
+            file_name,
+            file_size,
+            start_time,
+            end_time,
+            discharge_count,
+            rhythm,
+            frequency,
+            risk_level
+        ) VALUES (
+                     #{patientId},
+                     #{userId},
+                     #{fileName},
+                     #{fileSize},
+                     #{startTime},
+                     #{endTime},
+                     #{dischargeCount},
+                     #{rhythm},
+                     #{frequency},
+                     #{riskLevel}
+                 )
+    </insert>
+    <!-- 批量插入异常数据 -->
+    <insert id="batchInsertAnomalies">
+        INSERT INTO eeg_anomaly (analysis_id, type, severity)
+        VALUES
+        <foreach collection="anomalies" item="anomaly" separator=",">
+            (
+            #{anomaly.analysisId},
+            #{anomaly.type},
+            #{anomaly.severity}
+            )
+        </foreach>
+    </insert>
+
+    <!-- 插入主表数据 -->
+    <insert id="insertAnalysisResult" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO eeg_analysis_result (
+            patient_id,
+            user_id,
+            file_name,
+            file_size,
+            start_time,
+            end_time,
+            discharge_count,
+            rhythm,
+            frequency,
+            risk_level
+        ) VALUES (
+                     #{patientId},
+                     #{userId},
+                     #{fileName},
+                     #{fileSize},
+                     #{startTime},
+                     #{endTime},
+                     #{dischargeCount},
+                     #{rhythm},
+                     #{frequency},
+                     #{riskLevel}
+                 )
+    </insert>
+<!--    <select id="selectAnalysisResultPage" resultType="com.medicine.medicinespringboot.pojo.EegAnalysisResult">-->
+<!--        SELECT-->
+<!--        ear.*-->
+<!--        FROM-->
+<!--        eeg_analysis_result ear-->
+<!--        LEFT JOIN-->
+<!--        patient p ON ear.patient_id = p.id-->
+<!--        <where>-->
+<!--            <if test="name != null and name != ''">-->
+<!--                p.name LIKE CONCAT('%', #{name}, '%')-->
+<!--            </if>-->
+<!--        </where>-->
+<!--        ORDER BY ear.create_time DESC-->
+<!--    </select>-->
+    <!--带有医生和病人的姓名的查询-->
+<!--    <select id="selectAnalysisResultPage" resultType="com.medicine.medicinespringboot.pojo.EegAnalysisResult">-->
+<!--        SELECT-->
+<!--        ear.*,-->
+<!--        p.name AS patientName,  &#45;&#45; 患者姓名-->
+<!--        u.name AS doctorName    &#45;&#45; 医生姓名-->
+<!--        FROM-->
+<!--        eeg_analysis_result ear-->
+<!--        LEFT JOIN-->
+<!--        patient p ON ear.patient_id = p.id-->
+<!--        LEFT JOIN-->
+<!--        users u ON ear.user_id = u.id-->
+<!--        <where>-->
+<!--            <if test="name != null and name != ''">-->
+<!--                p.name LIKE CONCAT('%', #{name}, '%')-->
+<!--                OR u.name LIKE CONCAT('%', #{name}, '%')-->
+<!--            </if>-->
+<!--        </where>-->
+<!--        ORDER BY ear.create_time DESC-->
+<!--    </select>-->
+    <select id="selectAnalysisResultPage" resultType="com.medicine.medicinespringboot.pojo.EegAnalysisResult">
+        SELECT
+        ear.*,
+        p.name AS patientName,
+        u.name AS doctorName,
+        ear.create_time -- 明确选择 create_time
+        FROM
+        eeg_analysis_result ear
+        LEFT JOIN
+        patient p ON ear.patient_id = p.id
+        LEFT JOIN
+        users u ON ear.user_id = u.id
+        <where>
+            <if test="name != null and name != ''">
+                p.name LIKE CONCAT('%', #{name}, '%')
+                OR u.name LIKE CONCAT('%', #{name}, '%')
+            </if>
+        </where>
+        ORDER BY ear.create_time DESC
+    </select>
+    <select id="selectAnomaliesByAnalysisId" resultType="com.medicine.medicinespringboot.pojo.Anomaly">
+        SELECT * FROM eeg_anomaly WHERE analysis_id = #{analysisId}
+    </select>
+
+</mapper>

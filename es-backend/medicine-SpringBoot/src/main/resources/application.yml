@@ -1,0 +1,81 @@
+
+flask:
+  service:
+    url: http://localhost:5001/feature
+
+spring:
+  main:
+    allow-bean-definition-overriding: true
+    lazy-initialization: true
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    username: medicine
+    password: 1234
+    url: jdbc:mysql://localhost:3306/medicine?useUnicode=true&characterEncoding=utf-8&useSSL=false&serverTimezone=Asia/Shanghai
+  servlet:
+    multipart:
+      enabled: true
+      max-file-size: -1       #不限制文件大小
+      max-request-size: -1    # 最大支持请求大小
+  #  ai:
+  #    openai:
+  #      api-key: sk-7b15dea1055f4e30ac5a3a41a7241788
+  #      base-url: https://api.deepseek.com  #接口请求地址
+  #  ai:
+  #    openai:
+  #      api-key: sk-f15f384d49eb8df17db55a2d7034ea8eee5ab477281eb156e6279a226f51cc82
+  #      base-url: https://api.qnaigc.com/v1/chat/completions
+  #      chat:
+  #        options:
+  #          model: deepseek-v3
+  ai:
+    zhipuai:
+      api-key: e88ebb653f254f539499ee546bab8de8.vvoOV5UZUJd0UZ0k
+      chat:
+        options:
+          model: glm-4-plus
+      embedding:
+        enabled: true
+    openai:
+      api-key: 123456
+      base-url: https://api.openai-hk.com
+      chat:
+        options:
+          model: gpt-4o-mini
+      embedding:
+        enabled: true
+
+        # 阿里灵积
+    dash-scope:
+      api-key: sk-d0cc63cd52774383a8a0feb44d2fdc93
+      chat:
+        options:
+          model: qwen-max
+      embedding:
+        enabled: true
+
+
+mybatis:
+  configuration:
+    map-underscore-to-camel-case: true #开启驼峰命名，类似于将create_time转换为createTime
+
+
+
+
+
+
+# 七牛云
+qiniu:
+  accessKey: tmoRxAnYOPtcI5k2_5qceLe4nX6-ABYW-PT1PaRj
+  secretKey: k9-pw8JUBNCWQASOnG28trE7DdLhzlGM7DAmQRtT
+  bucket: epilepsy-detect
+  hostName: http://cloud.epilepsy-detect.xyz/
+
+#  spring.ai.openai.base-url=https://api.siliconflow.cn/
+#  spring.ai.openai.api-key=你自己的密钥
+#  spring.ai.openai.chat.options.model=deepseek-ai/DeepSeek-V3
+#  logging.level.org.springframework.ai.chat.client.advisor=DEBUG
+logging:
+  file:
+    name: logs/medicine.log
+

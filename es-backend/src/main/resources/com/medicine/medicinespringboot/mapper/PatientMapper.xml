@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.medicine.medicinespringboot.mapper.PatientMapper">
+    <select id="list" resultType="com.medicine.medicinespringboot.pojo.Patient">
+        select * from patient
+        <where>
+            <if test="username != null">
+                and name like concat('%', #{name}, '%')
+            </if>
+        </where>
+    </select>
+
+    <insert id="add" keyProperty="id" useGeneratedKeys="true">
+        INSERT INTO patient (name, age, male, phone, address, create_time, update_time)
+        VALUES (#{name}, #{age}, #{male}, #{phone}, #{address},  now(), now())
+    </insert>
+</mapper>
+
